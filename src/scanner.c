@@ -14,14 +14,14 @@ typedef struct {
 
 Scanner scanner;
 
-void initScanner(const char *source)
+void init_scanner(const char *source)
 {
 	scanner.current = source;
 	scanner.start = source;
 	scanner.line = 1;
 }
 
-static bool isAtend()
+static bool is_at_end()
 {
 	return *scanner.current == '\0';
 }
@@ -32,9 +32,21 @@ static char advance()
 	return scanner.current[-1];
 }
 
+static char peek()
+{
+	return *scanner.current;
+}
+
+static char peek_next()
+{
+	if (is_at_end())
+		return '\0';
+	return scanner.current[1];
+}
+
 static bool match(const char expected)
 {
-	if (isAtend())
+	if (is_at_end())
 		return false;
 	if (*scanner.current != expected)
 		return false;
@@ -43,7 +55,7 @@ static bool match(const char expected)
 	return true;
 }
 
-static Token makeToken(TokenType type)
+static Token make_token(TokenType type)
 {
 	Token token = {.type = type,
 		       .start = scanner.start,
@@ -52,7 +64,7 @@ static Token makeToken(TokenType type)
 	return token;
 }
 
-static Token errorToken(const char *message)
+static Token error_token(const char *message)
 {
 	Token token = {.type = TOKEN_ERROR,
 		       .start = message,
@@ -62,46 +74,76 @@ static Token errorToken(const char *message)
 	return token;
 }
 
-Token scanToken()
+static void skip_white_space()
 {
+	for (;;) {
+		char c = peek();
+		switch (c) {
+		case ' ':
+		case '\t':
+		case '\r':
+			advance();
+			break;
+		case '\n':
+			scanner.current++;
+			advance();
+			break;
+		case '/':
+			if (peek_next() == '/') {
+				while (peek() != '\n' && !is_at_end())
+					advance();
+			} else {
+				return;
+			}
+			break;
+		default:
+			return;
+		}
+	}
+}
+
+Token scan_token()
+{
+	skip_white_space();
 	scanner.start = scanner.current;
 
-	if (isAtend())
-		return makeToken(TOKEN_EOF);
+	if (is_at_end())
+		return make_token(TOKEN_EOF);
 
 	char c = advance();
 	switch (c) {
 	case '(':
-		return makeToken(TOKEN_LEFT_PAREN);
+		return make_token(TOKEN_LEFT_PAREN);
 	case ')':
-		return makeToken(TOKEN_RIGHT_PAREN);
+		return make_token(TOKEN_RIGHT_PAREN);
 	case '{':
-		return makeToken(TOKEN_LEFT_BRACE);
+		return make_token(TOKEN_LEFT_BRACE);
 	case '}':
-		return makeToken(TOKEN_RIGHT_BRACE);
+		return make_token(TOKEN_RIGHT_BRACE);
 	case ';':
-		return makeToken(TOKEN_SEMICOLON);
+		return make_token(TOKEN_SEMICOLON);
 	case ',':
-		return makeToken(TOKEN_COMMA);
+		return make_token(TOKEN_COMMA);
 	case '.':
-		return makeToken(TOKEN_DOT);
+		return make_token(TOKEN_DOT);
 	case '-':
-		return makeToken(TOKEN_MINUS);
+		return make_token(TOKEN_MINUS);
 	case '+':
-		return makeToken(TOKEN_PLUS);
+		return make_token(TOKEN_PLUS);
 	case '/':
-		return makeToken(TOKEN_SLASH);
+		return make_token(TOKEN_SLASH);
 	case '*':
-		return makeToken(TOKEN_STAR);
+		return make_token(TOKEN_STAR);
 	case '!':
-		return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
+		return make_token(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
 	case '=':
-        return makeToken(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
-    case '<':
-        return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-    case '>':
-        return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+		return make_token(match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL);
+	case '<':
+		return make_token(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
+	case '>':
+		return make_token(match('=') ? TOKEN_GREATER_EQUAL
+					     : TOKEN_GREATER);
 	}
 
-	return errorToken("Unexpected Character \n");
+	return error_token("Unexpected Character \n");
 }

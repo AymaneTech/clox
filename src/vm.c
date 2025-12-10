@@ -9,31 +9,31 @@
 
 VM vm;
 
-static void resetStack()
+static void reset_stack()
 {
-	vm.stackTop = vm.stack;
+	vm.stack_top = vm.stack;
 }
 
-void initVM()
+void init_VM()
 {
-	resetStack();
+	reset_stack();
 }
 
-void freeVM()
+void free_VM()
 {
 	printf("close vm \n");
 }
 
 void push(Value value)
 {
-	*vm.stackTop = value;
-	vm.stackTop++;
+	*vm.stack_top = value;
+	vm.stack_top++;
 }
 
 Value pop()
 {
-	vm.stackTop--;
-	return *vm.stackTop;
+	vm.stack_top--;
+	return *vm.stack_top;
 }
 
 static InterpretResult run()
@@ -50,13 +50,13 @@ static InterpretResult run()
 	for (;;) {
 #ifdef DEBUG_TRACE_EXECUTION
 		printf("                   ");
-		for (Value *slot = vm.stack; slot < vm.stackTop; slot++) {
+		for (Value *slot = vm.stack; slot < vm.stack_top; slot++) {
 			printf("[ ");
-			printValue(*slot);
+			print_value(*slot);
 			printf(" ]");
 		}
 		printf("\n");
-		disassembleInstruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
+		disassemble_instruction(vm.chunk, (int)(vm.ip - vm.chunk->code));
 #endif
 		uint8_t instruction;
 		switch (instruction = READ_BYTE()) {
@@ -81,7 +81,7 @@ static InterpretResult run()
 			push(-pop());
 			break;
 		case OP_RETURN: {
-			printValue(pop());
+			print_value(pop());
 			printf("\n");
 			return INTERPRET_OK;
 		}

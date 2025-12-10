@@ -18,7 +18,7 @@ static void repl()
 	}
 }
 
-static char *readFile(const char *path)
+static char *read_file(const char *path)
 {
 	FILE *fd = fopen(path, "rb");
 	if (fd == NULL) {
@@ -49,9 +49,9 @@ static char *readFile(const char *path)
 	return buffer;
 }
 
-static void runFile(const char *path)
+static void run_file(const char *path)
 {
-	char *source = readFile(path);
+	char *source = read_file(path);
 	InterpretResult result = interpret(source);
 	free(source);
 
@@ -63,17 +63,17 @@ static void runFile(const char *path)
 
 int main(int argc, const char *argv[])
 {
-	initVM();
+	init_VM();
 
 	if (argc == 1) {
 		repl();
 	} else if (argc == 2) {
-		runFile(argv[1]);
+		run_file(argv[1]);
 	} else {
 		fprintf(stderr, "Usage: clox [path]\n");
 		exit(64);
 	}
 
-	freeVM();
+	free_VM();
 	return 0;
 }

@@ -8,9 +8,9 @@
 
 typedef struct {
 	Chunk *chunk;
-	uint8_t *ip;  // aka of Instrction Pointer
+	uint8_t *ip; // aka of Instrction Pointer
 	Value stack[STACK_MAX];
-	Value *stackTop;
+	Value *stack_top;
 } VM;
 
 typedef enum {
@@ -19,8 +19,8 @@ typedef enum {
 	INTERPRET_RUNTIME_ERROR,
 } InterpretResult;
 
-void initVM();
-void freeVM();
+void init_VM();
+void free_VM();
 InterpretResult interpret(char *source);
 void push(Value value);
 Value pop();
