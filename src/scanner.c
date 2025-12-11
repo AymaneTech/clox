@@ -12,9 +12,7 @@ Scanner scanner;
 
 void init_scanner(const char *source)
 {
-	scanner.current = source;
-	scanner.start = source;
-	scanner.line = 1;
+	scanner = (Scanner){.current = source, .start = source, .line = 1};
 }
 
 static bool is_alpha(const char c)
@@ -91,7 +89,7 @@ static void skip_white_space()
 			advance();
 			break;
 		case '\n':
-			scanner.current++;
+			scanner.line++;
 			advance();
 			break;
 		case '/':

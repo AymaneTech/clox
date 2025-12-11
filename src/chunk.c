@@ -6,10 +6,12 @@
 
 void init_chunk(Chunk *chunk)
 {
-	chunk->count = 0;
-	chunk->capacity = 0;
-	chunk->code = NULL;
-	chunk->lines = NULL;
+    *chunk = (Chunk) {
+        .count = 0,
+        .capacity = 0,
+        .code = NULL,
+        .lines = NULL
+    };
 	init_value_array(&chunk->constants);
 }
 
