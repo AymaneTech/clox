@@ -14,5 +14,10 @@ test: $(TEST_SOURCES) $(SOURCES)
 	$(CC) $(CTEST_FLAGS) -o test_runner $(TEST_SOURCES) $(SOURCES) -I. $(LDFLAGS) 
 	./test_runner
 
+testf: $(TEST_SOURCES) $(SOURCES)
+	$(CC) $(CTEST_FLAGS) -o test_runner $(TEST_SOURCES) $(SOURCES) -I. $(LDFLAGS) 
+	./test_runner --fail-fast
+
+
 clean: 
 	rm -f test_runner clox
