@@ -360,3 +360,33 @@ Test(scanner, should_detect_eof)
     Token tok2 = scan_token();
     cr_assert_eq(tok2.type, TOKEN_EOF);
 }
+
+Test(scanner, should_detect_nill_true_false)
+{
+    char* source = "nil true false";
+    init_scanner(source);
+
+    Token nil = scan_token();
+    cr_assert_eq(nil.type, TOKEN_NIL);
+
+    Token _true = scan_token();
+    cr_assert_eq(_true.type, TOKEN_TRUE);
+
+    Token _false = scan_token();
+    cr_assert_eq(_false.type, TOKEN_FALSE);
+
+    Token eof = scan_token();
+    cr_assert_eq(eof.type, TOKEN_EOF);
+}
+
+Test(scanner, should_return_error_token_when_unexpected_token_found)
+{
+    char* source = "??";
+    init_scanner(source);
+
+    Token error_token = scan_token();
+    printf("%s", error_token.start);
+
+    cr_assert_eq(error_token.type, TOKEN_ERROR);
+    cr_assert(strcmp(error_token.start, "Unexpected Character"));
+}
