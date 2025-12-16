@@ -36,11 +36,12 @@ static void runtime_error(const char* format, ...)
 void init_VM()
 {
     reset_stack();
+    vm.objects = NULL;
 }
 
 void free_VM()
 {
-    printf("close vm \n");
+    free_objects();
 }
 
 void push(Value value)

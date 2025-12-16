@@ -7,6 +7,8 @@
 
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity) * 2)
 
+#define FREE(type, pointer) reallocate(pointer, sizeof(type), 0)
+
 #define GROW_ARRAY(type, pointer, oldCount, newCount)                          \
     (type*)reallocate(pointer, sizeof(type) * (oldCount),                      \
                       sizeof(type) * (newCount))
@@ -21,5 +23,6 @@
 // size = smaller than old size => shrink existing allocation old size =
 // non-zero, new size = larger than old size => grow existing allocation
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
+void  free_objects();
 
 #endif
