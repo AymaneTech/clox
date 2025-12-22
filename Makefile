@@ -9,7 +9,7 @@ TEST_SOURCES = tests/scanner_test.c tests/compiler_test.c
 all: clox
 
 clox: src/main.c $(SOURCES)
-	@$(CC) $(CFLAGS) -o clox src/main.c $(SOURCES) -I.
+	@$(CC) $(CFLAGS) -o clox src/main.c $(SOURCES) -I. && echo Compiled!!!!
 
 run: clox
 	@./clox

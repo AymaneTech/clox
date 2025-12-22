@@ -48,8 +48,23 @@ typedef struct
 
 } ParseRule;
 
-Parser parser;
-Chunk* compiling_chunk;
+typedef struct
+{
+    Token name;
+    int   depth;
+} Local;
+
+typedef struct
+{
+    Local locals[UINT8_COUNT];
+    int   local_count;
+    int   local_depth;
+
+} Compiler;
+
+Parser    parser;
+Compiler* current;
+Chunk*    compiling_chunk;
 
 static Chunk* current_chunk()
 {
@@ -93,14 +108,11 @@ static void error_at_current(const char* message)
 static void advance()
 {
     parser.previous = parser.current;
-
     for (;;)
     {
         parser.current = scan_token();
-
         if (parser.current.type != TOKEN_ERROR)
             break;
-
         error_at_current(parser.current.start);
     }
 }
@@ -112,7 +124,6 @@ static void consume(TokenType type, char* message)
         advance();
         return;
     }
-
     error_at_current(message);
 }
 
@@ -125,7 +136,6 @@ static bool match(TokenType type)
 {
     if (!check(type))
         return false;
-
     advance();
     return true;
 }
@@ -149,19 +159,24 @@ static void emit_return()
 static u8 make_constant(Value value)
 {
     int constant = add_constant(current_chunk(), value);
-
     if (constant > UINT8_MAX)
     {
         error("Too many constants in one chunk");
         return 0;
     }
-
     return (u8)constant;
 }
 
 static void emit_constant(Value value)
 {
     emit_bytes(OP_CONSTANT, make_constant(value));
+}
+
+static void init_compiler(Compiler* compiler)
+{
+    compiler->local_count = 0;
+    compiler->local_depth = 0;
+    current = compiler;
 }
 
 static void end_compiler()
@@ -171,6 +186,16 @@ static void end_compiler()
     if (!parser.had_error)
         disassemble_chunk(current_chunk(), "code");
 #endif
+}
+
+static void begin_scope()
+{
+    current->local_depth++;
+}
+
+static void end_scope()
+{
+    current->local_depth--;
 }
 
 static void       expression();
@@ -284,7 +309,9 @@ static void named_variable(Token name, bool can_assign)
         emit_bytes(OP_SET_GLOBAL, arg);
     }
     else
+    {
         emit_bytes(OP_GET_GLOBAL, arg);
+    }
 }
 
 static void variable(bool can_assign)
@@ -392,6 +419,16 @@ static void expression()
 
 // ---------------------- statements --------------------------
 
+static void block()
+{
+    while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF))
+    {
+        declaration();
+    }
+
+    consume(TOKEN_RIGHT_BRACE, "Expect '}' after block");
+}
+
 static void var_declaration()
 {
     u8 global = parse_variable("Expect variable name");
@@ -462,9 +499,19 @@ static void declaration()
 static void statement()
 {
     if (match(TOKEN_PRINT))
+    {
         print_statement();
+    }
+    else if (match(TOKEN_LEFT_BRACE))
+    {
+        begin_scope();
+        block();
+        end_scope();
+    }
     else
+    {
         expression_statement();
+    }
 }
 
 static inline void init_parser()
@@ -476,6 +523,8 @@ static inline void init_parser()
 bool compile(const char* source, Chunk* chunk)
 {
     init_scanner(source);
+    Compiler compiler;
+    init_compiler(&compiler);
     compiling_chunk = chunk;
     init_parser();
 

@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define UINT8_COUNT (UINT8_MAX + 1)
+
 typedef uint8_t  u8;
 typedef uint32_t u32;
 
