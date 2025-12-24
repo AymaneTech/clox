@@ -46,13 +46,13 @@ typedef struct
     ParseFn    prefix;
     ParseFn    infix;
     Precedence precedence;
-
 } ParseRule;
 
 typedef struct
 {
     Token name;
     int   depth;
+    bool  is_immutable;
 } Local;
 
 typedef struct
@@ -60,12 +60,12 @@ typedef struct
     Local locals[UINT8_COUNT];
     int   local_count;
     int   scope_depth;
-
 } Compiler;
 
-Parser    parser;
-Compiler* current;
-Chunk*    compiling_chunk;
+static bool immutable_globals[UINT8_MAX];
+Parser      parser;
+Compiler*   current;
+Chunk*      compiling_chunk;
 
 static Chunk* current_chunk()
 {
@@ -242,7 +242,7 @@ static int resolve_local(Compiler* compiler, Token* name)
     return -1;
 }
 
-static void add_local(Token name)
+static void add_local(Token name, bool is_immutable)
 {
     if (current->local_count == UINT8_COUNT)
     {
@@ -251,10 +251,11 @@ static void add_local(Token name)
     }
     Local* local = &current->locals[current->local_count++];
     local->name = name;
+    local->is_immutable = is_immutable;
     local->depth = -1;
 }
 
-static void declare_variable()
+static void declare_variable(bool is_immutable)
 {
     if (current->scope_depth == 0)
         return;
@@ -270,14 +271,14 @@ static void declare_variable()
         if (identifiers_equal(name, &local->name))
             error("Already variable with this name in this scope");
     }
-    add_local(*name);
+    add_local(*name, is_immutable);
 }
 
-static u8 parse_variable(char* error_message)
+static u8 parse_variable(bool is_immutable, char* error_message)
 {
     consume(TOKEN_IDENTIFIER, error_message);
 
-    declare_variable();
+    declare_variable(is_immutable);
     if (current->scope_depth > 0)
         return 0;
 
@@ -289,13 +290,14 @@ static void mark_initialized()
     current->locals[current->local_count - 1].depth = current->scope_depth;
 }
 
-static void define_variable(u8 global)
+static void define_variable(u8 global, bool is_immutable)
 {
     if (current->scope_depth > 0)
     {
         mark_initialized();
         return;
     }
+    immutable_globals[global] = is_immutable;
     emit_bytes(OP_DEFINE_GLOBAL, global);
 }
 
@@ -398,6 +400,21 @@ static void named_variable(Token name, bool can_assign)
 
     if (can_assign && match(TOKEN_EQUAL))
     {
+        if (get_op == OP_GET_LOCAL)
+        {
+            if (current->locals[arg].is_immutable == true)
+            {
+                error("Cannot reassign immutable variables");
+                return;
+            }
+        }
+        else
+        {
+            if (immutable_globals[arg])
+            {
+                error("Cannot reassign immutable variables");
+            }
+        }
         expression();
         emit_bytes(set_op, (u8)arg);
     }
@@ -524,15 +541,21 @@ static void block()
 
 static void var_declaration()
 {
-    u8 global = parse_variable("Expect variable name");
+    bool is_immutable = parser.previous.type == TOKEN_VAL;
+    u8   global = parse_variable(is_immutable, "Expect variable name");
 
+    if (is_immutable && !check(TOKEN_EQUAL))
+    {
+        error("Can't declare immutable variable without initializer");
+        return;
+    }
     if (match(TOKEN_EQUAL))
         expression();
     else
         emit_byte(OP_NIL);
 
     consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration");
-    define_variable(global);
+    define_variable(global, is_immutable);
 }
 
 static void expression_statement()
@@ -580,7 +603,7 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_VAR))
+    if (match(TOKEN_VAR) || match(TOKEN_VAL))
         var_declaration();
     else
         statement();

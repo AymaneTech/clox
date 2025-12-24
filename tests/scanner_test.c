@@ -1,5 +1,6 @@
 #include "../src/scanner.h"
 #include <criterion/criterion.h>
+#include <criterion/internal/assert.h>
 #include <stdio.h>
 
 typedef struct
@@ -388,4 +389,19 @@ Test(scanner, should_return_error_token_when_unexpected_token_found)
 
     cr_assert_eq(error_token.type, TOKEN_ERROR);
     cr_assert(strcmp(error_token.start, "Unexpected Character"));
+}
+
+Test(scanner, should_detect_val_keyword)
+{
+    char* source = "val user";
+    init_scanner(source);
+
+    Token val = scan_token();
+    cr_assert_eq(val.type, TOKEN_VAL);
+
+    Token val_name = scan_token();
+    cr_assert_eq(val_name.type, TOKEN_IDENTIFIER);
+
+    Token eof = scan_token();
+    cr_assert_eq(eof.type, TOKEN_EOF);
 }

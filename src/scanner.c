@@ -172,7 +172,13 @@ static TokenType identifier_type()
         }
         break;
     case 'v':
-        return check_keyword(1, 2, "ar", TOKEN_VAR);
+        if (scanner.current - scanner.start == 3 && scanner.start[1] == 'a')
+        {
+            return (scanner.start[2] == 'r')   ? TOKEN_VAR
+                   : (scanner.start[2] == 'l') ? TOKEN_VAL
+                                               : TOKEN_IDENTIFIER;
+        }
+        break;
     case 'w':
         return check_keyword(1, 4, "hile", TOKEN_WHILE);
     }
