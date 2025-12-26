@@ -64,9 +64,9 @@ typedef struct
 
 static bool immutable_globals[UINT8_MAX];
 
-Parser      parser;
-Compiler*   current;
-Chunk*      compiling_chunk;
+Parser    parser;
+Compiler* current;
+Chunk*    compiling_chunk;
 
 static Chunk* current_chunk()
 {
@@ -153,6 +153,14 @@ static void emit_bytes(u8 byte_1, u8 byte_2)
     emit_byte(byte_2);
 }
 
+static int emit_jump(u8 instruction)
+{
+    emit_byte(instruction);
+    emit_byte(0xff);
+    emit_byte(0xff);
+    return current_chunk()->count - 2;
+}
+
 static void emit_return()
 {
     emit_byte(OP_RETURN);
@@ -174,6 +182,15 @@ static void emit_constant(Value value)
     emit_bytes(OP_CONSTANT, make_constant(value));
 }
 
+static void patch_jump(int offset)
+{
+    int jump = current_chunk()->count - offset - 2;
+    if (jump > UINT16_MAX)
+        error("Too much code to jump over");
+
+    current_chunk()->code[offset] = (jump >> 8) & 0xff;
+    current_chunk()->code[offset + 1] = jump & 0xff;
+}
 static void init_compiler(Compiler* compiler)
 {
     compiler->local_count = 0;
@@ -566,6 +583,17 @@ static void expression_statement()
     emit_byte(OP_POP);
 }
 
+static void if_statement()
+{
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after if statement");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition");
+
+    int then_jump = emit_jump(OP_JUMP_IF_FALSE);
+    statement();
+    patch_jump(then_jump);
+}
+
 static void print_statement()
 {
     expression();
@@ -618,6 +646,10 @@ static void statement()
     if (match(TOKEN_PRINT))
     {
         print_statement();
+    }
+    else if (TOKEN_IF)
+    {
+        if_statement();
     }
     else if (match(TOKEN_LEFT_BRACE))
     {
