@@ -76,6 +76,8 @@ int disassemble_instruction(Chunk* chunk, int offset)
         return jump_instruction("OP_JUMP", 1, chunk, offset);
     case OP_JUMP_IF_FALSE:
         return jump_instruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
+    case OP_LOOP:
+        return jump_instruction("OP_JUMP_IF_FALSE", -1, chunk, offset);
     case OP_RETURN:
         return simple_instruction("OP_RETURN", offset);
     default:
@@ -100,7 +102,7 @@ static int byte_instruction(const char* name, Chunk* chunk, int offset)
 static int jump_instruction(const char* name, int sign, Chunk* chunk,
                             int offset)
 {
-    u16 jump = (u16)(chunk->code[offset + 1] << 8);
+    u16 jump = (u16)(chunk->code[offset + 1] << 8);  // n << 8 -> n * 2^8
     jump |= chunk->code[offset];
     printf("%-16s %4d -> %d\n", name, offset, offset + 3 + sign * jump);
     return offset + 3;
@@ -141,7 +143,6 @@ static const char* token_type_to_string(TokenType type)
         return "SLASH";
     case TOKEN_STAR:
         return "STAR";
-
     case TOKEN_BANG:
         return "BANG";
     case TOKEN_BANG_EQUAL:
@@ -158,14 +159,12 @@ static const char* token_type_to_string(TokenType type)
         return "LESS";
     case TOKEN_LESS_EQUAL:
         return "LESS_EQUAL";
-
     case TOKEN_IDENTIFIER:
         return "IDENTIFIER";
     case TOKEN_STRING:
         return "STRING";
     case TOKEN_NUMBER:
         return "NUMBER";
-
     case TOKEN_AND:
         return "AND";
     case TOKEN_CLASS:
@@ -200,7 +199,6 @@ static const char* token_type_to_string(TokenType type)
         return "VAL";
     case TOKEN_WHILE:
         return "WHILE";
-
     case TOKEN_ERROR:
         return "ERROR";
     case TOKEN_EOF:

@@ -1,9 +1,7 @@
-#include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
 
 #include "chunk.h"
 #include "common.h"
@@ -151,6 +149,18 @@ static void emit_bytes(u8 byte_1, u8 byte_2)
 {
     emit_byte(byte_1);
     emit_byte(byte_2);
+}
+
+static void emit_loop(int loop_start)
+{
+    emit_byte(OP_LOOP);
+
+    int offset = current_chunk()->count - loop_start + 2;
+    if (offset > UINT16_MAX)
+        error("Loop body too large");
+
+    emit_byte((offset >> 8) & 0xff);
+    emit_byte(offset & 0xff);
 }
 
 static int emit_jump(u8 instruction)
@@ -319,6 +329,16 @@ static void define_variable(u8 global, bool is_immutable)
     emit_bytes(OP_DEFINE_GLOBAL, global);
 }
 
+static void and_(bool can_assign)
+{
+    int end_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+    emit_byte(OP_POP);
+    parse_precedence(PREC_AND);
+
+    patch_jump(end_jump);
+}
+
 static void binary(bool can_assign)
 {
     TokenType operator_type = parser.previous.type;
@@ -391,6 +411,18 @@ static void number(bool can_assign)
 {
     double value = strtod(parser.previous.start, NULL);
     emit_constant(NUMBER_VAL(value));
+}
+
+static void or_(bool can_assign)
+{
+    int else_jump = emit_jump(OP_JUMP_IF_FALSE);
+    int end_jump = emit_jump(OP_JUMP);
+
+    patch_jump(else_jump);
+    emit_byte(OP_POP);
+
+    parse_precedence(PREC_OR);
+    patch_jump(end_jump);
 }
 
 static void string(bool can_assign)
@@ -489,7 +521,7 @@ ParseRule rules[] = {
     [TOKEN_STRING]         =  { string,    NULL,    PREC_NONE        },
     [TOKEN_NUMBER]         =  { number,    NULL,    PREC_NONE        },
     [TOKEN_IDENTIFIER]     =  { variable,  NULL,    PREC_NONE        },
-    [TOKEN_AND]            =  { NULL,      NULL,    PREC_NONE        },
+    [TOKEN_AND]            =  { NULL,      and_,    PREC_AND        },
     [TOKEN_CLASS]          =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_ELSE]           =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_FALSE]          =  { literal,   NULL,    PREC_NONE        },
@@ -497,7 +529,7 @@ ParseRule rules[] = {
     [TOKEN_FUN]            =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_IF]             =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_NIL]            =  { literal,   NULL,    PREC_NONE        },
-    [TOKEN_OR]             =  { NULL,      NULL,    PREC_NONE        },
+    [TOKEN_OR]             =  { NULL,      or_,     PREC_OR        },
     [TOKEN_PRINT]          =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_RETURN]         =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_SUPER]          =  { NULL,      NULL,    PREC_NONE        },
@@ -610,6 +642,23 @@ static void print_statement()
     emit_byte(OP_PRINT);
 }
 
+static void while_statement()
+{
+    int loop_start = current_chunk()->count;
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after while statement");
+    expression();
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition");
+
+    int exit_jump = emit_jump(OP_JUMP_IF_FALSE);
+
+    emit_byte(OP_POP);
+    statement();
+
+    emit_loop(loop_start);
+    patch_jump(exit_jump);
+    emit_byte(OP_POP);
+}
+
 static void synchronize()
 {
     parser.panic_mode = false;
@@ -659,6 +708,10 @@ static void statement()
     else if (match(TOKEN_IF))
     {
         if_statement();
+    }
+    else if (match(TOKEN_WHILE))
+    {
+        while_statement();
     }
     else if (match(TOKEN_LEFT_BRACE))
     {
