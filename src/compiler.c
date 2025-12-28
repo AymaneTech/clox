@@ -53,8 +53,17 @@ typedef struct
     bool  is_immutable;
 } Local;
 
+typedef enum
+{
+    TYPE_FUNCTION,
+    TYPE_SCRIPT,
+} FunctionType;
+
 typedef struct
 {
+    ObjFunction* function;
+    FunctionType type;
+
     Local locals[UINT8_COUNT];
     int   local_count;
     int   scope_depth;
@@ -63,12 +72,12 @@ typedef struct
 static bool immutable_globals[UINT8_MAX];
 
 Parser    parser;
-Compiler* current;
+Compiler* current = NULL;
 Chunk*    compiling_chunk;
 
 static Chunk* current_chunk()
 {
-    return compiling_chunk;
+    return &current->function->chunk;
 }
 
 static inline void error_at(Token* token, const char* message)
@@ -201,20 +210,33 @@ static void patch_jump(int offset)
     current_chunk()->code[offset] = (jump >> 8) & 0xff;
     current_chunk()->code[offset + 1] = jump & 0xff;
 }
-static void init_compiler(Compiler* compiler)
+static void init_compiler(Compiler* compiler, FunctionType type)
 {
+    compiler->function = NULL;
+    compiler->type = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
     current = compiler;
+
+    Local* local = &current->locals[current->local_count++];
+    local->depth = 0;
+    local->name.start = "";
+    local->name.length = 0;
 }
 
-static void end_compiler()
+static ObjFunction* end_compiler()
 {
     emit_return();
+    ObjFunction* function = current->function;
+
 #ifdef DEBUG_PRINT_CODE
     if (!parser.had_error)
-        disassemble_chunk(current_chunk(), "code");
+        disassemble_chunk(current_chunk(), function->name != NULL
+                                               ? function->name->chars
+                                               : "<script>");
 #endif
+
+    return function;
 }
 
 static void begin_scope()
@@ -615,7 +637,7 @@ static void expression_statement()
     emit_byte(OP_POP);
 }
 
-static void for_satement()
+static void for_statement()
 {
     begin_scope();
     consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'");
@@ -779,11 +801,11 @@ static inline void init_parser()
     parser.panic_mode = false;
 }
 
-bool compile(const char* source, Chunk* chunk)
+ObjFunction* compile(const char* source, Chunk* chunk)
 {
     init_scanner(source);
     Compiler compiler;
-    init_compiler(&compiler);
+    init_compiler(&compiler, TYPE_SCRIPT);
     compiling_chunk = chunk;
     init_parser();
 
@@ -794,5 +816,6 @@ bool compile(const char* source, Chunk* chunk)
     }
 
     end_compiler();
-    return !parser.had_error;
+    ObjFunction* function = end_compiler();
+    return parser.had_error ? NULL : function;
 }
