@@ -14,6 +14,8 @@
 #include "debug.h"
 #endif
 
+#define PARAMETERS_MAX 255
+
 typedef struct
 {
     Token previous;
@@ -59,10 +61,11 @@ typedef enum
     TYPE_SCRIPT,
 } FunctionType;
 
-typedef struct
+typedef struct Compiler
 {
-    ObjFunction* function;
-    FunctionType type;
+    struct Compiler* enclosing;
+    ObjFunction*     function;
+    FunctionType     type;
 
     Local locals[UINT8_COUNT];
     int   local_count;
@@ -212,11 +215,18 @@ static void patch_jump(int offset)
 }
 static void init_compiler(Compiler* compiler, FunctionType type)
 {
+    compiler->enclosing = current;
     compiler->function = NULL;
     compiler->type = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
     current = compiler;
+
+    if (type != TYPE_SCRIPT)
+    {
+        current->function->name =
+            copy_string(parser.previous.start, parser.previous.length);
+    }
 
     Local* local = &current->locals[current->local_count++];
     local->depth = 0;
@@ -236,6 +246,7 @@ static ObjFunction* end_compiler()
                                                : "<script>");
 #endif
 
+    current = current->enclosing;
     return function;
 }
 
@@ -337,6 +348,8 @@ static u8 parse_variable(bool is_immutable, char* error_message)
 
 static void mark_initialized()
 {
+    if (current->scope_depth == 0)
+        return;
     current->locals[current->local_count - 1].depth = current->scope_depth;
 }
 
@@ -611,6 +624,45 @@ static void block()
     consume(TOKEN_RIGHT_BRACE, "Expect '}' after block");
 }
 
+static void function(FunctionType type)
+{
+    Compiler compiler;
+    init_compiler(&compiler, type);
+    begin_scope();
+
+    consume(TOKEN_LEFT_PAREN, "Expect '(' after function name");
+
+    if (!check(TOKEN_RIGHT_PAREN))
+    {
+        do
+        {
+            if (++current->function->arity > PARAMETERS_MAX)
+            {
+                error_at_current("Can't have more than 255 parameters");
+            }
+
+            u8 param_const = parse_variable(false, "Expect parameter name");
+            define_variable(param_const, false);
+
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after function parameters");
+
+    consume(TOKEN_LEFT_BRACE, "Expect '{' before function body");
+    block();
+
+    ObjFunction* function = end_compiler();
+    emit_bytes(OP_CONSTANT, make_constant(OBJ_VAL(function)));
+}
+
+static void fun_declaration()
+{
+    u8 global = parse_variable(false, "Expect function name");
+    mark_initialized();
+    function(TYPE_FUNCTION);
+    define_variable(global, false);
+}
+
 static void var_declaration()
 {
     bool is_immutable = parser.previous.type == TOKEN_VAL;
@@ -766,7 +818,11 @@ static void synchronize()
 
 static void declaration()
 {
-    if (match(TOKEN_VAR) || match(TOKEN_VAL))
+    if (match(TOKEN_FUN))
+    {
+        fun_declaration();
+    }
+    else if (match(TOKEN_VAR) || match(TOKEN_VAL))
         var_declaration();
     else
         statement();
