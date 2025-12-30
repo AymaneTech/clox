@@ -276,10 +276,7 @@ static InterpretResult run()
 
 InterpretResult interpret(char* source)
 {
-    Chunk chunk;
-    init_chunk(&chunk);
-
-    ObjFunction* function = compile(source, &chunk);
+    ObjFunction* function = compile(source);
     if (function == NULL)
         return INTERPRET_COMPILE_ERROR;
 

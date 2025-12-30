@@ -76,7 +76,6 @@ static bool immutable_globals[UINT8_MAX];
 
 Parser    parser;
 Compiler* current = NULL;
-Chunk*    compiling_chunk;
 
 static Chunk* current_chunk()
 {
@@ -216,7 +215,7 @@ static void patch_jump(int offset)
 static void init_compiler(Compiler* compiler, FunctionType type)
 {
     compiler->enclosing = current;
-    compiler->function = NULL;
+    compiler->function = new_function();
     compiler->type = type;
     compiler->local_count = 0;
     compiler->scope_depth = 0;
@@ -462,8 +461,9 @@ static void or_(bool can_assign)
 
 static void string(bool can_assign)
 {
-    emit_constant(OBJ_VAL(
-        copy_string(parser.previous.start + 1, parser.previous.length - 2)));
+    ObjString* str =
+        copy_string(parser.previous.start + 1, parser.previous.length - 2);
+    emit_constant(OBJ_VAL(str));
 }
 
 static void named_variable(Token name, bool can_assign)
@@ -857,12 +857,11 @@ static inline void init_parser()
     parser.panic_mode = false;
 }
 
-ObjFunction* compile(const char* source, Chunk* chunk)
+ObjFunction* compile(const char* source)
 {
     init_scanner(source);
     Compiler compiler;
     init_compiler(&compiler, TYPE_SCRIPT);
-    compiling_chunk = chunk;
     init_parser();
 
     advance();
@@ -871,7 +870,6 @@ ObjFunction* compile(const char* source, Chunk* chunk)
         declaration();
     }
 
-    end_compiler();
     ObjFunction* function = end_compiler();
     return parser.had_error ? NULL : function;
 }
