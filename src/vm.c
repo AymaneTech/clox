@@ -1,3 +1,4 @@
+#include <linux/limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -66,6 +67,35 @@ Value pop()
 static Value peek(int distance)
 {
     return vm.stack_top[-1 - distance];
+}
+
+static bool call(ObjFunction* function, int arg_count)
+{
+    CallFrame* frame = &vm.frames[vm.frame_count++];
+    frame->function = function;
+    frame->ip = function->chunk.code;
+    frame->slots = vm.stack_top - arg_count - 1;
+    return true;
+}
+
+static bool call_value(Value callee, int arg_count)
+{
+    if (!IS_OBJ(callee))
+    {
+        runtime_error("Can only call functions and classes");
+        return false;
+    }
+
+    switch (OBJ_TYPE(callee))
+    {
+    case OBJ_FUNCTION:
+    {
+        return call(AS_FUNCTION(callee), arg_count);
+    }
+    default:
+        // No callable shit
+        break;
+    }
 }
 
 static bool is_falsey(Value value)
@@ -260,6 +290,16 @@ static InterpretResult run()
         {
             u16 offset = READ_SHORT();
             frame->ip -= offset;
+            break;
+        }
+        case OP_CALL:
+        {
+            u8 arg_count = READ_BYTE();
+            if (!call_value(peek(arg_count), arg_count))
+            {
+                return INTERPRET_RUNTIME_ERROR;
+            }
+            frame = &vm.frames[vm.frame_count - 1];
             break;
         }
         case OP_RETURN:

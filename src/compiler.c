@@ -363,6 +363,26 @@ static void define_variable(u8 global, bool is_immutable)
     emit_bytes(OP_DEFINE_GLOBAL, global);
 }
 
+static u8 arguments_list()
+{
+    u8 arg_count = 0;
+
+    if (!check(TOKEN_RIGHT_PAREN))
+    {
+        do
+        {
+            expression();
+            if (arg_count == 255)
+            {
+                error("Can't have more than 255 arguments");
+            }
+            arg_count++;
+        } while (match(TOKEN_COMMA));
+    }
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments");
+    return arg_count;
+}
+
 static void and_(bool can_assign)
 {
     int end_jump = emit_jump(OP_JUMP_IF_FALSE);
@@ -415,6 +435,12 @@ static void binary(bool can_assign)
     default:
         return;
     }
+}
+
+static void call(bool can_assign)
+{
+    u8 arg_count = arguments_list();
+    emit_bytes(OP_CALL, arg_count);
 }
 
 static void literal(bool can_assign)
@@ -534,7 +560,7 @@ static void unary(bool can_assign)
 }
 // clang-format off
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN]     =  { grouping,  NULL,    PREC_NONE        },
+    [TOKEN_LEFT_PAREN]     =  { grouping,  call,    PREC_CALL        },
     [TOKEN_RIGHT_PAREN]    =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_LEFT_BRACE]     =  { NULL,      NULL,    PREC_NONE        },
     [TOKEN_RIGHT_BRACE]    =  { NULL,      NULL,    PREC_NONE        },
