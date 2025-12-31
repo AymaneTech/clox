@@ -71,6 +71,18 @@ static Value peek(int distance)
 
 static bool call(ObjFunction* function, int arg_count)
 {
+    if (function->arity != arg_count)
+    {
+        runtime_error("Expected %d arguments but got %d.", function->arity,
+                      arg_count);
+    }
+    if (vm.frame_count == FRAMES_MAX)
+    {
+        // as Java developer i hate this exception,
+        // but sorry there no way to increase stack size here like jvm does :Joy
+        runtime_error("Stack Overflow");
+        return false;
+    }
     CallFrame* frame = &vm.frames[vm.frame_count++];
     frame->function = function;
     frame->ip = function->chunk.code;
@@ -321,6 +333,7 @@ InterpretResult interpret(char* source)
         return INTERPRET_COMPILE_ERROR;
 
     push(OBJ_VAL(function));
+    call_value(OBJ_VAL(function), 0);
     CallFrame* frame = &vm.frames[vm.frame_count++];
     frame->function = function;
     frame->ip = function->chunk.code;
